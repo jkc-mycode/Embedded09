@@ -67,6 +67,8 @@ UserControl.c (bluetooth)
         char    1 - mode 1 로 변경
                 2 - 기록 파일 요청
                 3 - 기록 파일 초기화
+                4 - 초기 설정하기
+                5 - 경보 끄기
         2.1.2, 입력 값 Security.c로 전송 (UserControl.c -> Security.c)
 
         2.2.1, 외부 메시지 수신( UserControl.c (HC-06) -> user(phone))
