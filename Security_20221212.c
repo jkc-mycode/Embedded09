@@ -24,13 +24,13 @@ bool MODE = 0;      //모드 전역변수, bluetooth에서 직접 접근
 bool WARNING = 0;   //보안 모드에서 현재 경보가 켜져있는지 아닌지
 int TIME_MODE = 0;  // 0 = day, 1 = hour
 float full_range = 0;
-float valid_range = 0;
+float v_range = 0;
 float margin = 15.0f;
 
 //ultra sonic sensor
 float Get_Range();
-float Set_Range();
-void Ultrasonic_Sensor(float v_range, struct tm* comp_time);
+void Set_Range();
+void Ultrasonic_Sensor(struct tm* comp_time);
 
 //
 void Alert_On(struct tm* m_time);
@@ -56,10 +56,10 @@ int main(){
         printf("wiringPiSetupGpio failed \n");
         return -1;
     }
-    if(wiringPiI2CSetupInterface() < 0){
-        printf("wiringPiI2CSetUpInterface failed \n");
-        return -1;
-    }
+    // if(wiringPiI2CSetupInterface() < 0){
+    //     printf("wiringPiI2CSetUpInterface failed \n");
+    //     return -1;
+    // }
     printf("wiringPi Setup Complete \n");
 
     pinMode(BUZZER, OUTPUT);
@@ -74,24 +74,27 @@ int main(){
 
     while (1)                       
     {
-        Ultrasonic_Sensor(valid_range, &checktime);
+        Ultrasonic_Sensor(&checktime);
     }
     
     return 0;  
     
 }
 
-void Ultrasonic_Sensor(float v_range, struct tm* comp_time){
+void Ultrasonic_Sensor(struct tm* comp_time){
     float temp = 0;
     int count = 0;
     bool t_mode = MODE;
+    printf("2\n");
     if(t_mode == 0){        //mode useual
          while (1){
             time_t sys_time = time(NULL);
             struct tm maintime = *localtime(&sys_time);
-
+            printf("%f\n", v_range);
             temp = Get_Range();
+
             if(temp < v_range){
+                printf("4\n");
                 Counter(&maintime, comp_time, &count);
             }
             if(MODE != t_mode){
@@ -107,7 +110,7 @@ void Ultrasonic_Sensor(float v_range, struct tm* comp_time){
 
             temp = Get_Range();
             if(temp < v_range){
-                Alert(&maintime);
+                Alert_On(&maintime);
             }
             if(MODE != t_mode){
                 printf("MODE CHANGE : SECURITY -> STATISTICS \n");
@@ -137,7 +140,7 @@ float Get_Range(){
 
     distance = (stop - start) / 58.;
     delay(50);
-
+    printf("%f\n", distance);
     return distance;
 }
 
@@ -145,14 +148,15 @@ void Set_Range(){
     float temp = 0.0f;
     temp = Get_Range();
     temp = temp - margin;
-    valid_range = temp;
+    v_range = temp;
+    printf("%f", temp);
 }
 
 //일정 시간이 경과하면 카운터 초기화,
 //기본적으로 파일에 카운터 저장
 void Counter(struct tm* m_time,struct tm* comp, int *m_cnt){
     FILE* temp;
-    temp = fopen("record.txt", "atw"); //파일 없을경우 생성, 파일 존재할 경우 뒤에 내용 추가
+    temp = fopen("./record.txt", "atw"); //파일 없을경우 생성, 파일 존재할 경우 뒤에 내용 추가
 
     switch (TIME_MODE){
     case 0:     // per day
@@ -162,6 +166,7 @@ void Counter(struct tm* m_time,struct tm* comp, int *m_cnt){
             memcpy(&(*comp), &(*m_time), sizeof(struct tm));
             *m_cnt = 0;
         }
+        printf("5\n");
         *m_cnt++;
         break;
     case 1:     // per hour
@@ -183,7 +188,7 @@ void Counter(struct tm* m_time,struct tm* comp, int *m_cnt){
 
 void Alert_On(struct tm* m_time){
     FILE* temp;
-    temp = fopen("alert_record.txt", "atw");
+    temp = fopen("./alert_record.txt", "atw");
     fprintf(temp, "%d/%d/%d %d:%d:%d\n",
             1900+m_time->tm_year,m_time->tm_mon+1,m_time->tm_mday,m_time->tm_hour,m_time->tm_min,m_time->tm_sec);
     fclose(temp);
@@ -231,13 +236,10 @@ void Bluetooth()
     char temp; //기록 내용 담을 임시변수
     char file_buffer[100];
 
-    if (wiringPiSetupGpio() == -1)
-        return 1;
-    
     if ((fd_serial = serialOpen(UART2_DEV, BAUD_RATE)) < 0)
     { // UART2 포트 오픈
         printf("Unable to open serial device.\n");
-        return 1;
+        return;
     }
 
     while (1)
@@ -261,7 +263,7 @@ void Bluetooth()
                     break;
                 case '3': //기록 파일 확인
                     if((fp = fopen("./pass_history.txt", "r")) == NULL){ //파일 열리는지 확인
-                        return 1; 
+                        return; 
                     }
                     while((fgets(file_buffer, sizeof(file_buffer), fp)) != NULL){ //파일이 끝날때 까지 반복
                         serialWriteBytes(fd_serial, file_buffer); //휴대폰으로 파일의 할줄씩 출력
@@ -272,7 +274,7 @@ void Bluetooth()
                     break;
                 case '4': //기록 파일 초기화 (파일 내용 지움)
                     if((fp = fopen("./pass_history.txt", "w")) == NULL){ //파일 열리는지 확인
-                        return 1; 
+                        return; 
                     }
                     fputs(" ", fp);
                     fclose(fp);
