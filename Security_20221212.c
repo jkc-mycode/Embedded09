@@ -3,13 +3,13 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <math.h>
+#include <fcntl.h>
 #include <wiringPi.h>
 #include <wiringPiI2C.h>
 #include <wiringSerial.h>
 #include <wiringPiSPI.h>
-#include <unistd.h>
-#include <math.h>
-#include <fcntl.h>
 
 #define BAUD_RATE 115200 
 #define SONIC_Trig  18
@@ -23,9 +23,13 @@ int SIGNAL = 0;     // bluetooth가 전송하는 설정 요구 값
 bool MODE = 0;      //모드 전역변수, bluetooth에서 직접 접근
 bool WARNING = 0;   //보안 모드에서 현재 경보가 켜져있는지 아닌지
 int TIME_MODE = 0;  // 0 = day, 1 = hour
+float full_range = 0;
+float valid_range = 0;
+float margin = 15.0f;
 
 //ultra sonic sensor
 float Get_Range();
+float Set_Range();
 void Ultrasonic_Sensor(float v_range, struct tm* comp_time);
 
 //
@@ -35,7 +39,7 @@ void Counter(struct tm* m_time,struct tm* comp, int *m_cnt);
 
 static const char *UART2_DEV = "/dev/ttyAMA1"; // UART2 연결을 위한 장치 파일
 
-void Bluetooth()
+void Bluetooth();
 unsigned char serialRead(const int fd);
 void serialWrite(const int fd, const unsigned char c);
 void serialWriteBytes(const int fd, const char *s);
@@ -44,10 +48,6 @@ void serialWriteBytes(const int fd, const char *s);
 
 
 int main(){
-    float full_range = 0;
-    float valid_range = 0;
-    float margin = 15.0f;
-
     //시간 기록을 위한 변수 (비갱신)
     time_t sys_time = time(NULL);
     struct tm checktime = *localtime(&sys_time);
@@ -93,7 +93,7 @@ void Ultrasonic_Sensor(float v_range, struct tm* comp_time){
 
             temp = Get_Range();
             if(temp < v_range){
-                Counter(&maintime, &comp_time, &count);
+                Counter(&maintime, comp_time, &count);
             }
             if(MODE != t_mode){
                 printf("MODE CHANGE : STATISTICS -> SECURITY \n");
@@ -140,6 +140,13 @@ float Get_Range(){
     delay(50);
 
     return distance;
+}
+
+void Set_Range(){
+    float temp = 0.0f;
+    temp = Get_Range();
+    temp = temp - margin;
+    valid_range = temp;
 }
 
 //일정 시간이 경과하면 카운터 초기화,
@@ -250,7 +257,7 @@ void Bluetooth()
                     //초음파 센서 보안모드 함수 실행
                     break;
                 case '2': //초기설정 모드
-                    
+                    Set_Range();
                     //초음파 센서 초기설정 함수 실행
                     break;
                 case '3': //기록 파일 확인
