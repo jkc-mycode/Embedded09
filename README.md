@@ -20,27 +20,27 @@
 ![image](https://user-images.githubusercontent.com/90839233/206896733-0d123e5a-1c0c-40eb-ad86-51fce4951a3b.png)
 
 ### 주요 개발 내용
-- 초음파 센서(HC-SR04) / Security.c
+- 초음파 센서(HC-SR04), 블루투스(HC-06) 및 BUZZER(액티브 스피커), LED / Security.c
 
-1. 최대 거래 측정
-2. 측정 유효 범위 = 최대 거리 - margin
+1. 초기 거리 측정
+2. 측정 기본값 = 초기 거리값 - margin(센서 오차범위)
 
 (통계모드일 때)
 
-3. 측정 유효 범위 > 측정 값 = 물체 인식
-4. 물체 인식 후, 다시 특정 유효 범위로 복귀시 counter 함수 호출
+3. 현재 측정값이 측정 기본값보다 작으면 물체 인식   (ex. 측정 기본값이 99cm이고 현재 거리 측정값이 30cm일 때 물체인식)
+4. 물체 인식 후 현재 측정값이 측정 기본값과 동일해지면 counter 함수 호출
 5. counter 함수 갱신 시 파일에 기록
 
 (보안모드일 때)
 
-3. 측정 유효 범위 > 측정값 = 물체 인식
-4. 물체 인식시 buzzer 작동((waring) on)
-5. UserControl에서 bool값 변화 (bool WARING FALSE) 수신시 부저 작동 종료
+3. 측정 기본값 > 현재 측정값 = 물체 인식
+4. 물체 인식시 LED, BUZZER 작동(bool WARNING = TRUE)
+5. 블루투스로 알람 해제를 입력하면 bool WARNING값이 FALSE가 되고 LED, BUZZER 작동 종료
 
-- 블루투스(HC-06) 및 액티브 스피커, LED / UserControl.c
+(Bluetooth 함수)
 
 1. 사용자 입력 대기
-2. 사용자가 값 입력 (user(phone) -> UserControl.c(HC-06))
+2. 사용자가 값 입력 (휴대폰의 Serial Bluetooth Terminal앱으로 0~5 입력 -> Bluetooth모듈로 수신)
 3. 블루투스로 받은 사용자의 입력에 따른 함수 실행
 - 0 : 보안모드로 변경
 - 1 : 통계모드로 변경
@@ -65,6 +65,8 @@
 ### 문제 및 해결방안
 
 ### 한계점
+1. 사람 여럿이 딱 붙어 지나가면 한 명으로 인식하게 된다.
+2. 초음파 센서 범위 아래나 위로 지나가면 인식할 수 없다. 
 
 ### 시연 영상
 
