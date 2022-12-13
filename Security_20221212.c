@@ -68,8 +68,7 @@ int main(){
     pinMode(SONIC_Echo, INPUT);
 
     //거리 측정 (초기 셋팅)
-    full_range = Get_Range();
-    valid_range = full_range - margin;
+    Set_Range();
 
     printf("Device Function Started... \n");
 
