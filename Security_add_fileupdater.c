@@ -27,6 +27,7 @@ float full_range = 0;
 float v_range = 0;
 float margin = 15.0f;
 int count = 0;
+int INDEX = 0;
 
 //ultra sonic sensor
 float Get_Range();
@@ -107,6 +108,7 @@ void Ultrasonic_Sensor(struct tm* comp_time){
             }
             if(MODE != t_mode){
                 printf("MODE CHANGE : STATISTICS -> SECURITY \n");
+                INDEX = 0;
                 break;
             }
         }
@@ -169,6 +171,7 @@ void Counter(struct tm* m_time,struct tm* comp){
         if(comp->tm_mday != m_time->tm_mday){
             memcpy(&(*comp), &(*m_time), sizeof(struct tm));
             count = 0;
+            INDEX++;
         }
         count++;
         break;
@@ -176,6 +179,7 @@ void Counter(struct tm* m_time,struct tm* comp){
         if(comp->tm_hour != m_time->tm_hour){
             count = 0; 
             memcpy(&(*comp), &(*m_time), sizeof(struct tm));
+            INDEX++;
         }
         count++;
         break;
@@ -183,6 +187,7 @@ void Counter(struct tm* m_time,struct tm* comp){
         if(comp->tm_min != m_time->tm_min){
             count = 0; 
             memcpy(&(*comp), &(*m_time), sizeof(struct tm));
+            INDEX++;
         }
         count++;
         break;
@@ -194,34 +199,52 @@ void Counter(struct tm* m_time,struct tm* comp){
 }
 
 void File_Updater(struct tm* m_time,struct tm* comp){
-    FILE* temp;
-    temp = fopen("./record.txt", "atw"); //파일 없을경우 생성, 파일 존재할 경우 뒤에 내용 추가
+    FILE* tempw;
+    FILE* tempr;
+    char buffer[255];
+    tempw = fopen("./record.txt", "atw"); //파일 없을경우 생성, 파일 존재할 경우 뒤에 내용 추가
+    tempr = fopen("./record.txt", "r");
+    int tempidx = 0;
     
+    while(fgets(buffer, 255, tempr) != NULL){
+        tempidx++;
+        if(INDEX == tempidx) break;
+    }
+
     switch (TIME_MODE){
     case 0:     // per day
-        if(comp->tm_mday != m_time->tm_mday){
-            fprintf(temp, "%d/%d/%d -%d-\n",
-                    1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,count);
+        if((comp->tm_mday != m_time->tm_mday)){
+            fprintf(tempw, "%d %d/%d/%d -%d-\n",
+                    INDEX,1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,count);
+        }else{
+            fprintf(tempr, "%d %d/%d/%d -%d-\n",
+                    INDEX,1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,count);
         }
         break;
     case 1:     // per hour
         if(comp->tm_hour != m_time->tm_hour){
-            fprintf(temp, "%d/%d/%d %d -%d-\n",
-                    1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,comp->tm_hour,count);
+            fprintf(tempw, "%d %d/%d/%d %d -%d-\n",
+                    INDEX, 1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,comp->tm_hour,count);
+        }else{
+            fprintf(tempr, "%d %d/%d/%d %d -%d-\n",
+                    INDEX, 1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,comp->tm_hour,count);
         }
         break;
     case 2:     // per min
         if(comp->tm_min != m_time->tm_min){
-            fprintf(temp, "%d/%d/%d %d:%d -%d-\n",
-                    1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,comp->tm_hour,comp->tm_min,count);
+            fprintf(tempw, "%d %d/%d/%d %d:%d -%d-\n",
+                    INDEX, 1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,comp->tm_hour,comp->tm_min,count);
+        }else{
+            fprintf(tempr, "%d %d/%d/%d %d:%d -%d-\n",
+                    INDEX, 1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,comp->tm_hour,comp->tm_min,count);
         }
         break;
     default:
         printf("invalid time setting \n");
         break;
     }
-    
-    fclose(temp);
+    fclose(tempw);
+    fclose(tempr);
 }
 
 void Alert_On(struct tm* m_time){
