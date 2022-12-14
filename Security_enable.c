@@ -63,6 +63,11 @@ int main(){
         printf("wiringPiSetupGpio failed \n");
         return -1;
     }
+
+    if ((fd_serial = serialOpen(UART2_DEV, BAUD_RATE)) < 0)
+    { // UART2 포트 오픈
+        printf("Unable to open serial device.\n");
+    }
     
     printf("wiringPi Setup Complete \n");
 
@@ -80,6 +85,7 @@ int main(){
 
     pthread_create(&tid1, NULL, Bluetooth, NULL);
     pthread_create(&tid2, NULL, Ultrasonic_Sensor, &checktime);
+    
 
     pthread_join(tid1, NULL);
     pthread_join(tid2, NULL);
@@ -96,13 +102,11 @@ void *Ultrasonic_Sensor(void* t){
     bool is_in = false;
     bool t_mode;
     
-    printf("asdasd\n");
-
     pthread_mutex_lock(&mutex);
     
     t_mode = MODE;
     if(t_mode == 0){        //mode useual
-         while (1){
+         //while (1){
             // time_t sys_time = time(NULL);
             // struct tm maintime = *localtime(&sys_time);
             // printf("v_range : %f\n", v_range);
@@ -125,10 +129,10 @@ void *Ultrasonic_Sensor(void* t){
             }
             printf("통계모드\n");
             delay(100);
-        }
+        //}
     }else if(t_mode == 1){  //mode security
-        while (1)
-        {
+        //while (1)
+        //{
             // time_t sys_time = time(NULL);
             // struct tm maintime = *localtime(&sys_time);
 
@@ -146,7 +150,7 @@ void *Ultrasonic_Sensor(void* t){
 
             printf("보안모드\n");
             delay(100);
-        }
+        //}
     }
     pthread_mutex_unlock(&mutex);
     }
@@ -271,25 +275,17 @@ void serialWrite(const int fd, const unsigned char c)
 
 void *Bluetooth()
 {
-    
-    // while(1) {
-    
     unsigned char dat; //데이터 임시 저장 변수
     FILE* fp; //파일 입출력 변수
     char temp; //기록 내용 담을 임시변수
     char file_buffer[100];
 
-    if ((fd_serial = serialOpen(UART2_DEV, BAUD_RATE)) < 0)
-    { // UART2 포트 오픈
-        printf("Unable to open serial device.\n");
-    }
-
     while (1)
     {
         
         pthread_mutex_lock(&mutex);
-        
-        printf("asdasdasd\n");
+        pthread_cond_wait(&cond, &mutex);
+        //printf("asdasdasd\n");
         if (serialDataAvail(fd_serial))
         {                                //읽을 데이터가 존재한다면,
             dat = serialRead(fd_serial); //버퍼에서 1바이트 값을 읽음
@@ -298,13 +294,13 @@ void *Bluetooth()
                 MODE = 0;
                 //초음파 센서 일반모드 함수 실행
                 printf("000000000000000\n");
-                pthread_cond_wait(&cond, &mutex);
+                
             }
             else if(dat == '1'){
                 MODE = 1;
                 printf("1111111111111111\n");
                 //초음파 센서 보안모드 함수 실행
-                pthread_cond_wait(&cond, &mutex);
+                // pthread_cond_wait(&cond, &mutex);
             }
 
             // switch(dat){
@@ -354,6 +350,4 @@ void *Bluetooth()
         delay(10);
         pthread_mutex_unlock(&mutex);
     } 
-
-    //}   
 }
