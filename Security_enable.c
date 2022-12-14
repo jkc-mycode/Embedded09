@@ -10,6 +10,8 @@
 #include <wiringPiI2C.h>
 #include <wiringSerial.h>
 #include <wiringPiSPI.h>
+#include <pthread.h>
+#include <ctype.h>
 
 #define BAUD_RATE 115200 
 #define SONIC_Trig  18
@@ -25,7 +27,7 @@ bool WARNING = 0;   //보안 모드에서 현재 경보가 켜져있는지 아�
 int TIME_MODE = 2;  // 0 = day, 1 = hour, 2 = min
 float full_range = 0;
 float v_range = 0;
-float margin = 15.0f;
+float margin = 10.0f;
 int count = 0;
 
 //ultra sonic sensor
@@ -46,7 +48,7 @@ void serialWrite(const int fd, const unsigned char c);
 void serialWriteBytes(const int fd, const char *s);
 
 //외부 입력 처리
-
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int main(){
     //시간 기록을 위한 변수 (비갱신)
@@ -86,19 +88,19 @@ void Ultrasonic_Sensor(struct tm* comp_time){
     float temp = 0;
     bool is_in = false;
     bool t_mode = MODE;
-    printf("2\n");
+    
     if(t_mode == 0){        //mode useual
          while (1){
             time_t sys_time = time(NULL);
             struct tm maintime = *localtime(&sys_time);
-            printf("%f\n", v_range);
+            printf("v_range : %f\n", v_range);
             temp = Get_Range();
 
             if(temp < v_range){
-                printf("4\n");
                 is_in = true;
                 //Counter(&maintime, comp_time, &count);
             }else if((temp >= v_range) && (is_in == true)){
+                printf("4\n");
                 Counter(&maintime, comp_time);
                 is_in = false;
             }
@@ -144,7 +146,7 @@ float Get_Range(){
 
     distance = (stop - start) / 58.;
     delay(50);
-    printf("%f\n", distance);
+    printf("temp : %f\n", distance);
     return distance;
 }
 
