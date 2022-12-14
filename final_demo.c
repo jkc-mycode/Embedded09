@@ -71,13 +71,9 @@ int main()
     char temp; //기록 내용 담을 임시변수
     char file_buffer[100];
 
-    if (wiringPiSetupGpio() == -1)
-        return 1;
-    
     if ((fd_serial = serialOpen(UART2_DEV, BAUD_RATE)) < 0)
     { // UART2 포트 오픈
         printf("Unable to open serial device.\n");
-        return 1;
     }
 
     while (1)
@@ -88,37 +84,54 @@ int main()
             
             switch(dat){
                 case '0': //일반모드
+                    pthread_mutex_lock(&mutex);
+                    MODE = 0;
+                    pthread_mutex_unlock(&mutex);
+                    printf("asdasdasd 0\n");
+                    
                     //초음파 센서 일반모드 함수 실행
+                    
                     break;
                 case '1': //보안모드
+                    pthread_mutex_lock(&mutex);
+                    MODE = 1;
+                    pthread_mutex_unlock(&mutex);
+                    printf("asdasdasd 1\n");
                     //초음파 센서 보안모드 함수 실행
                     break;
                 case '2': //초기설정 모드
+                    // Set_Range();
                     //초음파 센서 초기설정 함수 실행
+                    printf("2\n");
                     break;
                 case '3': //기록 파일 확인
-                    if((fp = fopen("./pass_history.txt", "r")) == NULL){ //파일 열리는지 확인
-                        return 1; 
-                    }
-                    while((fgets(file_buffer, sizeof(file_buffer), fp)) != NULL){ //파일이 끝날때 까지 반복
-                        serialWriteBytes(fd_serial, file_buffer); //휴대폰으로 파일의 할줄씩 출력
-                        printf("%s", file_buffer);
-                        memset(file_buffer, 0, sizeof(file_buffer)); //메모리 초기화
-                    }
-                    fclose(fp);
+                    // if((fp = fopen("./pass_history.txt", "r")) == NULL){ //파일 열리는지 확인
+                    //     break;
+                    // }
+                    // while((fgets(file_buffer, sizeof(file_buffer), fp)) != NULL){ //파일이 끝날때 까지 반복
+                    //     serialWriteBytes(fd_serial, file_buffer); //휴대폰으로 파일의 할줄씩 출력
+                    //     printf("%s", file_buffer);
+                    //     memset(file_buffer, 0, sizeof(file_buffer)); //메모리 초기화
+                    // }
+                    // fclose(fp);
+                    printf("3\n");
                     break;
                 case '4': //기록 파일 초기화 (파일 내용 지움)
-                    if((fp = fopen("./pass_history.txt", "w")) == NULL){ //파일 열리는지 확인
-                        return 1; 
-                    }
-                    fputs(" ", fp);
-                    fclose(fp);
+                    // if((fp = fopen("./pass_history.txt", "w")) == NULL){ //파일 열리는지 확인
+                    //     break;
+                    // }
+                    // fputs(" ", fp);
+                    // fclose(fp);
+                    printf("4\n");
                     break;
                 case '5': //경보 끄기
                     //경보 on/off 할 함수 추가
-                    Speaker_LED_OnOff(FALSE);
+                    // WARNING = FALSE;
+                    // Alert_off();
+                    printf("5\n");
                     break;
             }
+            pthread_exit(NULL);
         }
         delay(10);
     }    
