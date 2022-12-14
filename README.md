@@ -89,7 +89,7 @@
 ----------------------------
 
 ### 시연 영상
-[![Watch the video](https://i9.ytimg.com/vi_webp/Ix-1Xho6wZE/mq3.webp?sqp=CLDZ5pwG-oaymwEmCMACELQB8quKqQMa8AEB-AH-CYAC0AWKAgwIABABGEEgVShlMA8=&rs=AOn4CLAcrYciQtIyh678uNMjMwZB713RXA)](https://https://youtu.be/Ix-1Xho6wZE)
+[![Watch the video](https://i9.ytimg.com/vi_webp/Ix-1Xho6wZE/mq3.webp?sqp=CLDZ5pwG-oaymwEmCMACELQB8quKqQMa8AEB-AH-CYAC0AWKAgwIABABGEEgVShlMA8=&rs=AOn4CLAcrYciQtIyh678uNMjMwZB713RXA)](https://youtu.be/Ix-1Xho6wZE)
 
 ----------------------------
 
