@@ -87,7 +87,7 @@ int main(){
     pthread_join(tid1, NULL);
     pthread_join(tid2, NULL);
 
-    pthread_mutex_destroy(&mutex);
+    pthread_cond_destroy(&cond);
     return 0;  
 }
 
@@ -121,8 +121,6 @@ void *Ultrasonic_Sensor(void* t){
                 printf("MODE CHANGE : STATISTICS -> SECURITY \n");
                 //break;
             }
-            //printf("Mode : %d\n", MODE);
-            //printf("통계모드\n");
             fflush(stdout);
             delay(100);
             
@@ -141,7 +139,6 @@ void *Ultrasonic_Sensor(void* t){
                 printf("MODE CHANGE : SECURITY -> STATISTICS \n");
                 //break;
             }
-            //printf("보안모드\n");
             fflush(stdout);
             delay(10);
         }
@@ -207,7 +204,6 @@ void Counter(struct tm* m_time,struct tm* comp){
         break;
     case 2:     // per min
         if(comp->tm_min != m_time->tm_min){
-            printf("@@@@@@@@@@@@@@@@@@123123@@@@@@@@@@@@@\n");
             fp = fopen("./record.txt", "atw");
             sprintf(buf, "%2d/%2d/%2d %2d:%2d (%2d명)\n", 1900+m_time->tm_year,m_time->tm_mon+1,m_time->tm_mday,m_time->tm_hour,m_time->tm_min,count);
             fprintf(fp, buf);
@@ -218,7 +214,6 @@ void Counter(struct tm* m_time,struct tm* comp){
             //INDEX++;
         }
         count++;
-        printf("증가증가증가증가증가증가\n");
         break;
     default:
         printf("invalid time setting \n");
