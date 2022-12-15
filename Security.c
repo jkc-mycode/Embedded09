@@ -369,17 +369,29 @@ void *Bluetooth()
                 }
                 fclose(fp);
             }
-            else if(dat == '4'){
-                if((fp = fopen("./record.txt", "w")) == NULL){ //파일 열리는지 확인
-                    break;
-                }
-                fputs(" ", fp);
+            else if(dat == '4'){ //기록확인
+                // if((fp = fopen("./record.txt", "w")) == NULL){ //파일 열리는지 확인
+                //     break;
+                // }
+                // fputs(" ", fp);
                 count = 0;
                 fclose(fp);
             }
-            else if(dat == '5'){
+            else if(dat == '5'){ //경보 해제
                 WARNING = FALSE;
                 Alert_off();
+            }
+            else if(dat == '6'){ //일간 측정으로 변경
+                TIME_MODE = 0;
+            }
+            else if(dat == '7'){ //시간 측정으로 변경
+                TIME_MODE = 1;
+            }
+            else if(dat == '8'){ //분간 측정으로 변경
+                TIME_MODE = 2;
+            }
+            else if(dat == '9'){ //종료
+                pthread_exit(NULL);
             }
         }
         delay(10);
