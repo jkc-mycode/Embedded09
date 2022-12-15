@@ -47,8 +47,6 @@ unsigned char serialRead(const int fd);
 void serialWrite(const int fd, const unsigned char c);
 void serialWriteBytes(const int fd, const char *s);
 
-//외부 입력 처리
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond;
 
 int main(){
