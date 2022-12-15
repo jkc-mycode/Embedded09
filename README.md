@@ -17,6 +17,7 @@
 - 블루투스 모듈(HC-06)
 - 액티브 스피커
 - LED
+- Serial Bluetooth Terminal
 
 -----------------------------------
 
@@ -62,8 +63,27 @@
     
 ----------------------------
 
-### 제한조건 구현 내용
-1. 제한조건 구현 내용 (멀티프로세스/쓰레드, IPC/뮤텍스)
+### 제한조건 구현 내용 (멀티프로세스/쓰레드, IPC/뮤텍스)
+1. 쓰레드를 통해서 블루투스 모듈과 초음파 센서를 동시에 실행시킨다.
+2. 블루투스와 초음파센서 사이에 뮤텍스가 반드시 필요한 곳이 없었다.
+3. 대신에 Pthread의 조건 변수를 사용하여 블루투스와 초음파 센서의 동기화에 사용했다. 
+4. 블루투스 모듈에서 pthread_cond_wait() 를 통해서 실행 시 일단 대기 상대로 만든다.
+5. 초음파 센서에서 MODE나 WARNING의 변경을 확인하고 가져올 때만 pthread_cond_signal()로 블루투스를 깨운다.
+6. pthread_cond_signal()로 깨어났을 때만 값이 적용된다.
+
+```c
+    void *Ultrasonic_Sensor(void *t){
+      ....
+      pthread_cond_signal(&cond); //블루투스 쓰레드를 대기상태에서 깨우는 함수
+      ....
+    }
+
+    void *Bluetooth(){
+      ....
+      pthread_cond_wait(&cond, &mutex); //블루투스를 대기상태로 바꿈
+      ....
+    }
+```
 
 ----------------------------
 
@@ -90,13 +110,15 @@
 ----------------------------
 
 ### 시연 영상
-[![Video Label](https://i.ytimg.com/an_webp/Ix-1Xho6wZE/mqdefault_6s.webp?du=3000&sqp=CPuL7JwG&rs=AOn4CLCzhc5cFHW5XfktlgtnU3F4ireQ6A)](https://youtu.be/Ix-1Xho6wZE)
+[![Video Label](https://img.youtube.com/vi/Ix-1Xho6wZE/0.jpg)](https://youtu.be/Ix-1Xho6wZE)
 
 ----------------------------
 
 ### 참고자료
 1. 강의자료
-2. Pthread_cond documentation : https://www.joinc.co.kr/w/Site/Thread/Beginning/PthreadApiReference#AEN144
+2. Pthread_cond documentation (https://www.joinc.co.kr/w/Site/Thread/Beginning/PthreadApiReference#AEN144)
+3. 조건변수를 통한 스레드 동기화 설명, 예제 (https://reakwon.tistory.com/99)
+4. 라즈베리파이에 GPIO 파이썬을 이용해 초음파 센서 (https://playneko.github.io/2020/06/19/rasberry-pi/rasberry-pi-025/)
 
 
 
