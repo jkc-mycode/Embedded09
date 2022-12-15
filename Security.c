@@ -108,7 +108,7 @@ void *Ultrasonic_Sensor(void* t){
             printf("v_range : %f\n", v_range);
             temp = Get_Range();
 
-            File_Updater(&maintime, comp_time);
+            //File_Updater(&maintime, comp_time);
             if(temp < v_range){
                 is_in = true;
                 //Counter(&maintime, comp_time, &count);
@@ -184,6 +184,9 @@ void Set_Range(){
 //일정 시간이 경과하면 카운터 초기화,
 //기본적으로 파일에 카운터 저장
 void Counter(struct tm* m_time,struct tm* comp){
+    FILE* fp;
+    char buf[1024];
+    printf("================%d  %d================\n", comp->tm_min, m_time->tm_min);
 
     switch (TIME_MODE){
     case 0:     // per day
@@ -204,11 +207,18 @@ void Counter(struct tm* m_time,struct tm* comp){
         break;
     case 2:     // per min
         if(comp->tm_min != m_time->tm_min){
+            printf("@@@@@@@@@@@@@@@@@@123123@@@@@@@@@@@@@\n");
+            fp = fopen("./record.txt", "atw");
+            sprintf(buf, "%2d/%2d/%2d %2d:%2d (%2d명)\n", 1900+m_time->tm_year,m_time->tm_mon+1,m_time->tm_mday,m_time->tm_hour,m_time->tm_min,count);
+            fprintf(fp, buf);
+            count = 0; 
+            fclose(fp);
             count = 0; 
             memcpy(&(*comp), &(*m_time), sizeof(struct tm));
-            INDEX++;
+            //INDEX++;
         }
         count++;
+        printf("증가증가증가증가증가증가\n");
         break;
     default:
         printf("invalid time setting \n");
@@ -276,8 +286,6 @@ void Alert_On(struct tm* m_time, struct tm* comp){
 
     temp = fopen("./alert_record.txt", "atw");
     if(checktime->tm_sec == m_time->tm_sec){
-        // fprintf(temp, "%d/%d/%d %d:%d:%d\n",
-        //     1900+m_time->tm_year,m_time->tm_mon+1,m_time->tm_mday,m_time->tm_hour,m_time->tm_min,m_time->tm_sec);
         sprintf(buf, "******WARNING******\n%d/%d/%d %d:%d:%d\n***********************\n",
             1900+m_time->tm_year,m_time->tm_mon+1,m_time->tm_mday,m_time->tm_hour,m_time->tm_min,m_time->tm_sec);
         fprintf(temp, buf);
@@ -346,17 +354,17 @@ void *Bluetooth()
         {                                //읽을 데이터가 존재한다면,
             dat = serialRead(fd_serial); //버퍼에서 1바이트 값을 읽음
             
-            if(dat == '0'){
+            if(dat == '0'){ //통계모드 변경
                 MODE = 0;
-                //초음파 센서 일반모드 함수 실행
+                serialWriteBytes(fd_serial, "통계모드 실행\n");
             }
-            else if(dat == '1'){
+            else if(dat == '1'){ //보안모드 변경
                 MODE = 1;
-                //초음파 센서 보안모드 함수 실행
+                serialWriteBytes(fd_serial, "보안모드 실행\n");
             }
             else if(dat == '2'){ //초기설정 모드
                 Set_Range();
-                //초음파 센서 초기설정 함수 실행
+                serialWriteBytes(fd_serial, "측정 범위 변경\n");
             }
             else if(dat == '3'){ //파일 열리는지 확인
                 if((fp = fopen("./record.txt", "r")) == NULL){ //파일 열리는지 확인
@@ -369,13 +377,14 @@ void *Bluetooth()
                 }
                 fclose(fp);
             }
-            else if(dat == '4'){ //기록확인
-                // if((fp = fopen("./record.txt", "w")) == NULL){ //파일 열리는지 확인
-                //     break;
-                // }
-                // fputs(" ", fp);
+            else if(dat == '4'){ //기록삭제
+                if((fp = fopen("./record.txt", "w")) == NULL){ //파일 열리는지 확인
+                    break;
+                }
+                fputs(" ", fp);
                 count = 0;
                 fclose(fp);
+                serialWriteBytes(fd_serial, "측정 기록 삭제\n");
             }
             else if(dat == '5'){ //경보 해제
                 WARNING = FALSE;
@@ -383,15 +392,19 @@ void *Bluetooth()
             }
             else if(dat == '6'){ //일간 측정으로 변경
                 TIME_MODE = 0;
+                serialWriteBytes(fd_serial, "기록 간격 : 하루\n");
             }
             else if(dat == '7'){ //시간 측정으로 변경
                 TIME_MODE = 1;
+                serialWriteBytes(fd_serial, "기록 간격 : 1시간\n");
             }
             else if(dat == '8'){ //분간 측정으로 변경
                 TIME_MODE = 2;
+                serialWriteBytes(fd_serial, "기록 간격 : 1분\n");
             }
             else if(dat == '9'){ //종료
-                pthread_exit(NULL);
+                serialWriteBytes(fd_serial, "프로그램이 종료됩니다.\n");
+                exit(0);
             }
         }
         delay(10);
