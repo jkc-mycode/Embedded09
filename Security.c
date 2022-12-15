@@ -4,49 +4,48 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-//#include <math.h>
 #include <fcntl.h>
 #include <wiringPi.h>
 #include <wiringSerial.h>
 #include <pthread.h>
-//#include <ctype.h>
 
 #define BAUD_RATE 115200 
-#define SONIC_Trig  18
-#define SONIC_Echo  4
-#define BUZZER 23
-#define LED 24
+#define SONIC_Trig 18 //초음파 트리거 GPIO
+#define SONIC_Echo 4 //초음파 에코 GPIO
+#define BUZZER 23 //스피커 GPIO
+#define LED 24 //LED GPIO
 #define BT_RXD 1
 #define BT_TXD 0
 
-bool MODE = 0;      //모드 전역변수, bluetooth에서 직접 접근
-bool WARNING = 0;   //보안 모드에서 현재 경보가 켜져있는지 아닌지
-int TIME_MODE = 2;  // 0 = day, 1 = hour, 2 = min
-float full_range = 0;
-float v_range = 0;
-int count = 0;
-int fd_serial;     // UART2 파일 서술자
-int INDEX = 0;
-
+bool MODE = 0; //모드 전역변수, bluetooth에서 직접 접근
+bool WARNING = 0; //보안 모드에서 현재 경보가 켜져있는지 아닌지
+int TIME_MODE = 2; // 0 = day, 1 = hour, 2 = min
+float v_range = 0; //실제 유효 범위
+int count = 0; //통행량 기록 변수
+int fd_serial; // UART2 파일 서술자
 
 //ultra sonic sensor
-float Get_Range();
-void Set_Range();
+float Get_Range(); //초음파 거리를 가져올 함수
+void Set_Range(); //초기 거리 설정 함수
 void *Ultrasonic_Sensor(void* t);
 
-//
+//경보 On/Off 함수들
 void Alert_On(struct tm* m_time, struct tm* comp);
 void Alert_Off();
+
+//시간을 비교하여 통행량을 세고 기록할 함수
 void Counter(struct tm* m_time,struct tm* comp);
-void File_Updater(struct tm* m_time,struct tm* comp);
 
 static const char *UART2_DEV = "/dev/ttyAMA1"; // UART2 연결을 위한 장치 파일
 
-void *Bluetooth();
+//블루투스를 통해 데이터 통신할 함수들
 unsigned char serialRead(const int fd);
 void serialWrite(const int fd, const unsigned char c);
 void serialWriteBytes(const int fd, const char *s);
+void *Bluetooth();
 
+//뮤텍스 사용 및 조건변수 사용
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond;
 
 int main(){
@@ -55,18 +54,20 @@ int main(){
     struct tm checktime = *localtime(&sys_time);
     pthread_t tid1, tid2;
     
+    //wiringPi 초기화
     if(wiringPiSetupGpio() < 0){
         printf("wiringPiSetupGpio failed \n");
         return -1;
     }
 
-    if ((fd_serial = serialOpen(UART2_DEV, BAUD_RATE)) < 0)
-    { // UART2 포트 오픈
+    // UART2 포트 오픈
+    if ((fd_serial = serialOpen(UART2_DEV, BAUD_RATE)) < 0){ 
         printf("Unable to open serial device.\n");
     }
     
     printf("wiringPi Setup Complete \n");
 
+    //초음파, 부저, LED 핀모드 설정
     pinMode(BUZZER, OUTPUT);
     pinMode(LED, OUTPUT);
     pinMode(SONIC_Trig, OUTPUT);
@@ -74,31 +75,38 @@ int main(){
 
     //거리 측정 (초기 셋팅)
     Set_Range();
-
     printf("\nDevice Function Started... \n");
 
+    //쓰레드 조건 변수 초기화
     pthread_cond_init(&cond, NULL);
+    //쓰레드 생성(블루투스 쓰레드 함수 동작)
+    //평소에 대기상태였다가 쓰레드 조건 변수로 깨어나서 실행됨
     pthread_create(&tid1, NULL, Bluetooth, NULL);
+    //순서 맞추기 위해서 사용
     delay(100);
+    //쓰레드 생성(초음파센서 쓰레드 함수 동작)
+    //동시에 같이 실행시키기 위해서 쓰레드 함수로 실행
     pthread_create(&tid2, NULL, Ultrasonic_Sensor, &checktime);
 
+    //쓰레드들 기다림
     pthread_join(tid1, NULL);
     pthread_join(tid2, NULL);
-
-    pthread_cond_destroy(&cond);
+    
+    //뮤텍스 종료
+    pthread_mutex_destroy(&mutex);
     return 0;  
 }
 
 void *Ultrasonic_Sensor(void* t){
     struct tm* comp_time = (struct tm*) t;
     float temp = 0;
-    bool is_in = false;
+    bool is_in = false; //범위에 들어왔는지 확인 플래그
     while(1){
         bool t_mode = MODE;
-
-        if(t_mode == 0){        //mode useual
-            if (serialDataAvail(fd_serial)){
-                pthread_cond_signal(&cond);
+        if(t_mode == 0){ //통계모드일때
+            //초음파센서는 항상 동작하다가 블루투스로 입력이 들어오면
+            if (serialDataAvail(fd_serial)){ 
+                pthread_cond_signal(&cond); //블루투스 쓰레드를 대기상태에서 깨우는 함수
             }
             
             time_t sys_time = time(NULL);
@@ -106,36 +114,34 @@ void *Ultrasonic_Sensor(void* t){
             printf("v_range : %f\n", v_range);
             temp = Get_Range();
 
-            //File_Updater(&maintime, comp_time);
-            if(temp < v_range){
+            if(temp < v_range){ //유효범위안에 들어왔을 때
                 is_in = true;
-                //Counter(&maintime, comp_time, &count);
-            }else if((temp >= v_range) && (is_in == true)){
-                printf("====================\n");
+            }else if((temp >= v_range) && (is_in == true)){ //범위에 들어왔다가 나갈때, 유효범위들어 왔을 때
+                printf("==========체크체크==========\n");
                 Counter(&maintime, comp_time);
                 is_in = false;
             }
             if(MODE != t_mode){
                 printf("MODE CHANGE : STATISTICS -> SECURITY \n");
-                //break;
             }
             fflush(stdout);
             delay(100);
             
-        }else if(t_mode == 1){  //mode security
+        }else if(t_mode == 1){ //보안모드일때
+            //초음파센서는 항상 동작하다가 블루투스로 입력이 들어오면
             if (serialDataAvail(fd_serial)){
-                pthread_cond_signal(&cond);
+                //블루투스 쓰레드를 대기상태에서 깨우는 함수 (MODE를 바꾸기 위해서)
+                pthread_cond_signal(&cond); 
             }
             time_t sys_time = time(NULL);
             struct tm maintime = *localtime(&sys_time);
 
             temp = Get_Range();
-            if(temp < v_range){
-                Alert_On(&maintime, comp_time);
+            if(temp < v_range){ //범위에 들어오면
+                Alert_On(&maintime, comp_time); //알람 울림
             }
             if(MODE != t_mode){
                 printf("MODE CHANGE : SECURITY -> STATISTICS \n");
-                //break;
             }
             fflush(stdout);
             delay(10);
@@ -146,19 +152,15 @@ void *Ultrasonic_Sensor(void* t){
 float Get_Range(){
     float distance, start, stop;
 
-    //
     digitalWrite(SONIC_Echo, LOW);
     digitalWrite(SONIC_Trig, HIGH);
     delayMicroseconds(10);
     digitalWrite(SONIC_Trig, LOW);
-    //
-
-    //
+    
     while(digitalRead(SONIC_Echo) == LOW) 
         start = micros();
     while(digitalRead(SONIC_Echo) == HIGH) 
         stop = micros();
-    //
 
     distance = (stop - start) / 58.;
     delay(50);
@@ -181,94 +183,42 @@ void Set_Range(){
 void Counter(struct tm* m_time,struct tm* comp){
     FILE* fp;
     char buf[1024];
-    printf("================%d  %d================\n", comp->tm_min, m_time->tm_min);
-
+    fp = fopen("./record.txt", "atw");
     switch (TIME_MODE){
-    case 0:     // per day
-        if(comp->tm_mday != m_time->tm_mday){
-            memcpy(&(*comp), &(*m_time), sizeof(struct tm));
-            count = 0;
-            INDEX++;
-        }
-        count++;
-        break;
-    case 1:     // per hour
-        if(comp->tm_hour != m_time->tm_hour){
-            count = 0; 
-            memcpy(&(*comp), &(*m_time), sizeof(struct tm));
-            INDEX++;
-        }
-        count++;
-        break;
-    case 2:     // per min
-        if(comp->tm_min != m_time->tm_min){
-            fp = fopen("./record.txt", "atw");
-            sprintf(buf, "%2d/%2d/%2d %2d:%2d (%2d명)\n", 1900+m_time->tm_year,m_time->tm_mon+1,m_time->tm_mday,m_time->tm_hour,m_time->tm_min,count);
-            fprintf(fp, buf);
-            count = 0; 
-            fclose(fp);
-            count = 0; 
-            memcpy(&(*comp), &(*m_time), sizeof(struct tm));
-            //INDEX++;
-        }
-        count++;
-        break;
-    default:
-        printf("invalid time setting \n");
-        break;
+        case 0: //일간 기록 측정
+            if(comp->tm_mday != m_time->tm_mday){
+                sprintf(buf, "%2d/%2d/%2d (%d명)\n", 1900+m_time->tm_year,m_time->tm_mon+1,m_time->tm_mday,count);
+                fprintf(fp, buf);
+                fclose(fp);
+                count = 0;
+                memcpy(&(*comp), &(*m_time), sizeof(struct tm));
+            }
+            count++;
+            break;
+        case 1: //시간 기록 측정
+            if(comp->tm_hour != m_time->tm_hour){
+                sprintf(buf, "%2d/%2d/%2d %2d시 (%d명)\n", 1900+m_time->tm_year,m_time->tm_mon+1,m_time->tm_mday,m_time->tm_hour,count);
+                fprintf(fp, buf);
+                fclose(fp);
+                count = 0; 
+                memcpy(&(*comp), &(*m_time), sizeof(struct tm));
+            }
+            count++;
+            break;
+        case 2: //분간 기록 측정
+            if(comp->tm_min != m_time->tm_min){
+                sprintf(buf, "%2d/%2d/%2d %2d:%2d (%d명)\n", 1900+m_time->tm_year,m_time->tm_mon+1,m_time->tm_mday,m_time->tm_hour,m_time->tm_min,count);
+                fprintf(fp, buf);
+                fclose(fp);
+                count = 0; 
+                memcpy(&(*comp), &(*m_time), sizeof(struct tm));
+            }
+            count++;
+            break;
+        default:
+            printf("invalid time setting \n");
+            break;
     }
-
-}
-
-void File_Updater(struct tm* m_time,struct tm* comp){
-    FILE* tempw;
-    FILE* tempr;
-    char buffer[255];
-    tempw = fopen("./record.txt", "atw"); //파일 없을경우 생성, 파일 존재할 경우 뒤에 내용 추가
-    tempr = fopen("./record.txt", "w");
-    int tempidx = 0;
-
-    if(INDEX > 0){
-        while(fgets(buffer, 255, tempr) != NULL){
-            if(tempidx == INDEX-1) break;
-            tempidx++;
-        }
-    }
-
-    switch (TIME_MODE){
-    case 0:     // per day
-        if((comp->tm_mday != m_time->tm_mday)){
-            fprintf(tempw, "%d %d/%d/%d -%d-\n",
-                    INDEX,1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,count);
-        }else{
-            fprintf(tempr, "%d %d/%d/%d -%d-\n",
-                    INDEX,1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,count);
-        }
-        break;
-    case 1:     // per hour
-        if(comp->tm_hour != m_time->tm_hour){
-            fprintf(tempw, "%d %d/%d/%d %d -%d-\n",
-                    INDEX, 1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,comp->tm_hour,count);
-        }else{
-            fprintf(tempr, "%d %d/%d/%d %d -%d-\n",
-                    INDEX, 1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,comp->tm_hour,count);
-        }
-        break;
-    case 2:     // per min
-        if(comp->tm_min != m_time->tm_min){
-            fprintf(tempw, "%d %d/%d/%d %d:%d -%d-\n",
-                    INDEX, 1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,comp->tm_hour,comp->tm_min,count);
-        }else{
-            fprintf(tempr, "%d %d/%d/%d %d:%d -%d-\n",
-                    INDEX, 1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,comp->tm_hour,comp->tm_min,count);
-        }
-        break;
-    default:
-        printf("invalid time setting \n");
-        break;
-    }
-    fclose(tempw);
-    fclose(tempr);
 }
 
 void Alert_On(struct tm* m_time, struct tm* comp){
@@ -290,8 +240,10 @@ void Alert_On(struct tm* m_time, struct tm* comp){
     
     digitalWrite(BUZZER, HIGH);
     while(WARNING){
+        //블루투스로 입력이 들어오면
         if (serialDataAvail(fd_serial)){
-            pthread_cond_signal(&cond);
+            //블루투스 쓰레드를 대기상태에서 깨우는 함수 (WARNING를 바꾸기 위해) 
+            pthread_cond_signal(&cond); 
         }
         digitalWrite(LED, HIGH);
         delay(100);
@@ -333,7 +285,7 @@ void serialWrite(const int fd, const unsigned char c)
     write(fd, &c, 1); // write 함수를 통해 1바이트 씀
 }
 
-void *Bluetooth()
+void *Bluetooth() //블루투스 모듈 쓰레드 함수
 {
     unsigned char dat; //데이터 임시 저장 변수
     FILE* fp; //파일 입출력 변수
