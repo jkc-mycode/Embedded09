@@ -17,7 +17,7 @@
 - 블루투스 모듈(HC-06)
 - 액티브 스피커
 - LED
-- Serial Bluetooth Terminal
+- Serial Bluetooth Terminal(휴대폰 앱)
 
 -----------------------------------
 
