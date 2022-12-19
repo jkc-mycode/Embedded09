@@ -25,6 +25,7 @@
 
 ## 전체 시스템 구조
 ![image](https://user-images.githubusercontent.com/90839233/206896733-0d123e5a-1c0c-40eb-ad86-51fce4951a3b.png)
+![image](https://user-images.githubusercontent.com/90839233/208356806-8013c851-17e7-46d9-9e72-5807edf4b77f.png)
 
 -----------------------------------
 
