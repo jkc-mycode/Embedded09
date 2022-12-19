@@ -18,6 +18,17 @@
 #define BT_TXD 0
 #define MAX_SIZE 3 //Queue 사이즈
 
+typedef struct NODE{
+    float data;
+    struct NODE* Next;
+}node;
+
+typedef struct QUEUE{
+    node* front;
+    node* rear;
+    int count;
+}queue;
+
 bool MODE = 0; //모드 전역변수, bluetooth에서 직접 접근
 bool WARNING = 0; //보안 모드에서 현재 경보가 켜져있는지 아닌지
 int TIME_MODE = 2; // 0 = day, 1 = hour, 2 = min
@@ -55,17 +66,7 @@ bool check_Queue(queue* myqueue);
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond;
 
-typedef struct NODE{
-    float data;
-    struct NODE* Next;
-    struct NODE* Fore;
-}node;
 
-typedef struct QUEUE{
-    node* front;
-    node* rear;
-    int count;
-}queue;
 
 int main(){
     //시간 기록을 위한 변수 (비갱신)
@@ -95,7 +96,7 @@ int main(){
 
     //거리 측정 (초기 셋팅)
     Set_Range();
-    init_Queue(disqueue);
+    init_Queue(&distqueue);
     printf("\nDevice Function Started... \n");
 
     //쓰레드 조건 변수 초기화
@@ -134,8 +135,9 @@ void *Ultrasonic_Sensor(void* t){
             struct tm maintime = *localtime(&sys_time);
             printf("v_range : %f\n", v_range);
             temp = Get_Range();
-            en_de_Queue(distqueue, temp);
-            is_in = check_Queue(distqueue);
+            en_de_Queue(&distqueue, temp);
+            is_in = check_Queue(&distqueue);
+            printf("%d\n", is_in);
 
             if((temp >= v_range) && (is_in == true)){ //범위에 들어왔다가 나갈때, 유효범위들어 왔을 때
                 printf("==========체크체크==========\n");
@@ -146,7 +148,7 @@ void *Ultrasonic_Sensor(void* t){
                 printf("MODE CHANGE : STATISTICS -> SECURITY \n");
             }
             fflush(stdout);
-            delay(100);
+            delay(10);
             
         }else if(t_mode == 1){ //보안모드일때
             //초음파센서는 항상 동작하다가 블루투스로 입력이 들어오면
@@ -158,7 +160,7 @@ void *Ultrasonic_Sensor(void* t){
             struct tm maintime = *localtime(&sys_time);
 
             temp = Get_Range();
-            en_de_Queue(disqueue, temp);
+            en_de_Queue(&distqueue, temp);
             if(temp < v_range){ //범위에 들어오면
                 Alert_On(&maintime, comp_time); //알람 울림
             }
@@ -202,57 +204,64 @@ void Set_Range(){
 
 int isEmpty(queue *myqueue)
 {
-    return myqueue->count == 0;   
+    return myqueue->count;   
 }
 
 void init_Queue(queue* myqueue){
     int temp = 0;
+    myqueue->front = myqueue->rear = NULL;
+    myqueue->count = 0;
     while(temp < MAX_SIZE){
-        en_de_Queue(myqueue, valid_range);
+        en_de_Queue(myqueue, v_range+1);
         temp++;
     }
+    
 }
 
 void en_de_Queue(queue* myqueue, float info){
     node* newnode = (node*)malloc(sizeof(node));
     newnode->data = info;
     newnode->Next = NULL;
-    newnode->Fore = NULL;
 
     if(isEmpty(myqueue) == 0){
         myqueue->front = newnode;
         myqueue->rear = newnode;
+        
     }else{
         myqueue->rear->Next = newnode;
+        
     }
+    
     myqueue->rear = newnode;
     myqueue->count++;
-
     if(myqueue->count > MAX_SIZE){
         node* temp;
         temp = myqueue->front;
         myqueue->front = temp->Next;
+        myqueue->count--;
         free(temp);
     }
 }
 
-bool check_Queue(queue* myqueue){           // 큐의 모든 측정값이 거리 내에 들어올경우에 참 반환
+bool check_Queue(queue* myqueue){ //큐의 모든 측정값이 거리 내에 들어올경우에 참 반환
     node* ptr;
+    bool re_Data;
     ptr = myqueue->front;
-    while (ptr != myqueue->rear->Next) //NULL 이 아닐 떄까지 반복
+    int _count = 1;
+    while (ptr != NULL) //NULL 이 아닐 떄까지 반복
     {
-        int count = 0;
-        if(count < MAX_SIZE){
-            return true;
+        if(_count == MAX_SIZE){
+            re_Data = true;
         }else{
-            if(ptr->data > valid_range){
-                return false;
+            if(ptr->data > v_range){
+                re_Data = false;
             }else{
-                count++;
+                _count++;
             }
         }
         ptr = ptr->Next;
     }
+    return re_Data;
 }
 
 //일정 시간이 경과하면 카운터 초기화,
@@ -284,7 +293,7 @@ void Counter(struct tm* m_time,struct tm* comp){
             break;
         case 2: //분간 기록 측정
             if(comp->tm_min != m_time->tm_min){
-                sprintf(buf, "%2d/%2d/%2d %2d:%2d (%d명)\n", 1900+m_time->tm_year,m_time->tm_mon+1,m_time->tm_mday,m_time->tm_hour,m_time->tm_min,count);
+                sprintf(buf, "%2d/%2d/%2d %2d:%2d (%d명)\n", 1900+comp->tm_year,comp->tm_mon+1,comp->tm_mday,comp->tm_hour,comp->tm_min,count);
                 fprintf(fp, buf);
                 fclose(fp);
                 count = 0; 
