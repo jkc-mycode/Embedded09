@@ -71,6 +71,7 @@
     6 : 일간 측정으로 변경 => TIME_MODE 변수 0으로 변경
     7 : 시간 측정으로 변경 => TIME_MODE 변수 1로 변경
     8 : 분간 측정으로 변경 => TIME_MODE 변수 2로 변경
+    9 : 종료
 ```
 ![KakaoTalk_20221219_140918593](https://user-images.githubusercontent.com/90839233/208352292-40694ef4-357e-47a3-9931-257a5865a961.jpg)
 
