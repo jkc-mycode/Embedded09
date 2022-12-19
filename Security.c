@@ -16,6 +16,7 @@
 #define LED 24 //LED GPIO
 #define BT_RXD 1
 #define BT_TXD 0
+#define MAX_SIZE 3 //Queue 사이즈
 
 bool MODE = 0; //모드 전역변수, bluetooth에서 직접 접근
 bool WARNING = 0; //보안 모드에서 현재 경보가 켜져있는지 아닌지
@@ -23,6 +24,7 @@ int TIME_MODE = 2; // 0 = day, 1 = hour, 2 = min
 float v_range = 0; //실제 유효 범위
 int count = 0; //통행량 기록 변수
 int fd_serial; // UART2 파일 서술자
+queue distqueue;
 
 //ultra sonic sensor
 float Get_Range(); //초음파 거리를 가져올 함수
@@ -44,15 +46,33 @@ void serialWrite(const int fd, const unsigned char c);
 void serialWriteBytes(const int fd, const char *s);
 void *Bluetooth();
 
+int isEmpty(queue *myqueue);
+void init_Queue(queue* myqueue);
+void en_de_Queue(queue* myqueue, float info);
+bool check_Queue(queue* myqueue);
+
 //뮤텍스 사용 및 조건변수 사용
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond;
+
+typedef struct NODE{
+    float data;
+    struct NODE* Next;
+    struct NODE* Fore;
+}node;
+
+typedef struct QUEUE{
+    node* front;
+    node* rear;
+    int count;
+}queue;
 
 int main(){
     //시간 기록을 위한 변수 (비갱신)
     time_t sys_time = time(NULL);
     struct tm checktime = *localtime(&sys_time);
     pthread_t tid1, tid2;
+    
     
     //wiringPi 초기화
     if(wiringPiSetupGpio() < 0){
@@ -75,6 +95,7 @@ int main(){
 
     //거리 측정 (초기 셋팅)
     Set_Range();
+    init_Queue(disqueue);
     printf("\nDevice Function Started... \n");
 
     //쓰레드 조건 변수 초기화
@@ -113,10 +134,10 @@ void *Ultrasonic_Sensor(void* t){
             struct tm maintime = *localtime(&sys_time);
             printf("v_range : %f\n", v_range);
             temp = Get_Range();
+            en_de_Queue(distqueue, temp);
+            is_in = check_Queue(distqueue);
 
-            if(temp < v_range){ //유효범위안에 들어왔을 때
-                is_in = true;
-            }else if((temp >= v_range) && (is_in == true)){ //범위에 들어왔다가 나갈때, 유효범위들어 왔을 때
+            if((temp >= v_range) && (is_in == true)){ //범위에 들어왔다가 나갈때, 유효범위들어 왔을 때
                 printf("==========체크체크==========\n");
                 Counter(&maintime, comp_time);
                 is_in = false;
@@ -137,6 +158,7 @@ void *Ultrasonic_Sensor(void* t){
             struct tm maintime = *localtime(&sys_time);
 
             temp = Get_Range();
+            en_de_Queue(disqueue, temp);
             if(temp < v_range){ //범위에 들어오면
                 Alert_On(&maintime, comp_time); //알람 울림
             }
@@ -176,6 +198,61 @@ void Set_Range(){
     temp = temp - margin;
     v_range = temp;
     printf("%f", temp);
+}
+
+int isEmpty(queue *myqueue)
+{
+    return myqueue->count == 0;   
+}
+
+void init_Queue(queue* myqueue){
+    int temp = 0;
+    while(temp < MAX_SIZE){
+        en_de_Queue(myqueue, valid_range);
+        temp++;
+    }
+}
+
+void en_de_Queue(queue* myqueue, float info){
+    node* newnode = (node*)malloc(sizeof(node));
+    newnode->data = info;
+    newnode->Next = NULL;
+    newnode->Fore = NULL;
+
+    if(isEmpty(myqueue) == 0){
+        myqueue->front = newnode;
+        myqueue->rear = newnode;
+    }else{
+        myqueue->rear->Next = newnode;
+    }
+    myqueue->rear = newnode;
+    myqueue->count++;
+
+    if(myqueue->count > MAX_SIZE){
+        node* temp;
+        temp = myqueue->front;
+        myqueue->front = temp->Next;
+        free(temp);
+    }
+}
+
+bool check_Queue(queue* myqueue){           // 큐의 모든 측정값이 거리 내에 들어올경우에 참 반환
+    node* ptr;
+    ptr = myqueue->front;
+    while (ptr != myqueue->rear->Next) //NULL 이 아닐 떄까지 반복
+    {
+        int count = 0;
+        if(count < MAX_SIZE){
+            return true;
+        }else{
+            if(ptr->data > valid_range){
+                return false;
+            }else{
+                count++;
+            }
+        }
+        ptr = ptr->Next;
+    }
 }
 
 //일정 시간이 경과하면 카운터 초기화,
