@@ -27,7 +27,7 @@
 
 ## 전체 시스템 구조
 ![image](https://user-images.githubusercontent.com/90839233/206896733-0d123e5a-1c0c-40eb-ad86-51fce4951a3b.png)
-![Embedded_Fors ps](https://user-images.githubusercontent.com/66898122/208358969-8e17a24b-eeb3-4a9d-95c1-115e78276a86.png)
+![Untitled Sketch_bb](https://user-images.githubusercontent.com/66898122/208363420-efb5acdc-d414-4f19-bc43-8e8abfa08ead.png)
 
 -----------------------------------
 
