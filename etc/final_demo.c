@@ -117,7 +117,9 @@ void *Ultrasonic_Sensor(void* t){
             printf("v_range : %f\n", v_range);
             temp = Get_Range();
 
-            if((temp >= v_range) && (is_in == true)){ //범위에 들어왔다가 나갈때, 유효범위들어 왔을 때
+            if(temp < v_range){ //유효범위안에 들어왔을 때
+                is_in = true;
+            }else if((temp >= v_range) && (is_in == true)){ //범위에 들어왔다가 나갈때, 유효범위들어 왔을 때
                 printf("==========체크체크==========\n");
                 Counter(&maintime, comp_time);
                 is_in = false;
